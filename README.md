@@ -1,16 +1,39 @@
-# React + Vite
+# 🌍 Crypto Converter
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**React-приложение для конвертации криптовалют в фиатные валюты**
 
-Currently, two official plugins are available:
+![Demo](https://img.shields.io/badge/demo-live-brightgreen)
+![React](https://img.shields.io/badge/React-18-blue)
+![Vite](https://img.shields.io/badge/Vite-5-purple)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🔗 Live Demo
+[🚀 Посмотреть проект](https://crypto-converter-ваш-ник.vercel.app) *(ссылка появится после деплоя)*
 
-## React Compiler
+## ✨ Функционал
+- Конвертация 15+ криптовалют (BTC, ETH, USDT, SOL, TON и др.)
+- Поддержка 4 фиатных валют: USD, EUR, BYN, RUB
+- Реальные курсы через CryptoCompare API
+- История операций с сохранением в localStorage
+- Адаптивный дизайн (мобильные + десктоп)
+- Тёмная тема, современный UI
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Технологии
+- React 18 + Hooks (useState, useEffect)
+- Vite (сборка)
+- CSS Variables + Flexbox/Grid
+- CryptoCompare API
+- LocalStorage для сохранения данных
 
-## Expanding the ESLint configuration
+## 🚀 Запуск локально
+```bash
+# Клонировать репозиторий
+git clone https://github.com/alexander-maxX/crypto-converter.git
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+# Перейти в папку
+cd crypto-converter
+
+# Установить зависимости
+npm install
+
+# Запустить разработку
+npm run dev
