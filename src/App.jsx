@@ -21,6 +21,9 @@ const CRYPTO_OPTIONS = [
 
 const FIAT_OPTIONS = ['USD', 'EUR', 'BYN', 'RUB'];
 
+// Актуальный курс USD к BYN (обновляется вручную или через API НБРБ)
+const USD_TO_BYN_RATE = 2.82; // По состоянию на май 2026
+
 export default function App() {
   const [prices, setPrices] = useState({});
   const [amount, setAmount] = useState('1');
@@ -30,7 +33,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Загрузка истории из localStorage при старте
   useEffect(() => {
     const saved = localStorage.getItem('crypto_history');
     if (saved) {
@@ -42,41 +44,47 @@ export default function App() {
     }
   }, []);
 
-  // Получение курсов с API
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        setLoading(true);        setError(null);
         
         const cryptos = CRYPTO_OPTIONS.map(c => c.id).join(',');
-        const fiats = FIAT_OPTIONS.join(',');
-        
+        // Запрашиваем только USD и EUR, так как BYN может быть некорректным
         const res = await fetch(
-          `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${cryptos}&tsyms=${fiats}`
+          `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${cryptos}&tsyms=USD,EUR,RUB`
         );
         
         if (!res.ok) throw new Error(`Ошибка API: ${res.status}`);
         
         const data = await res.json();
         
-        // Проверка валидности ответа
-        if (!data.BTC || typeof data.BTC[FIAT_OPTIONS[0]] !== 'number') {
+        // Проверяем валидность данных
+        if (!data.BTC || typeof data.BTC.USD !== 'number') {
           throw new Error('Неверный формат данных');
         }
+
+        // Добавляем расчет BYN через USD
+        const pricesWithBYN = {};
+        Object.keys(data).forEach(crypto => {
+          pricesWithBYN[crypto] = {
+            ...data[crypto],
+            BYN: data[crypto].USD * USD_TO_BYN_RATE
+          };
+        });
         
-        setPrices(data);
+        setPrices(pricesWithBYN);
       } catch (err) {
         console.error('API ошибка:', err.message);
         setError('⚠️ Не удалось загрузить курсы. Проверьте интернет-соединение.');
-        setPrices({}); // Очищаем цены при ошибке, чтобы не показывать старое
+        setPrices({});
       } finally {
         setLoading(false);
       }
     };
 
     fetchPrices();
-    // Автообновление каждые 30 секунд
+    // Обновляем каждые 30 секунд
     const intervalId = setInterval(fetchPrices, 30000);
     
     return () => clearInterval(intervalId);
@@ -88,8 +96,7 @@ export default function App() {
   const formattedResult = toFiat === 'BYN' || toFiat === 'RUB' ? result.toFixed(2) : result.toFixed(4);
 
   const saveToHistory = () => {
-    if (numericAmount <= 0 || !price) return;
-    const entry = {
+    if (numericAmount <= 0 || !price) return;    const entry = {
       amount: numericAmount,
       from: fromCrypto,
       to: toFiat,
@@ -138,8 +145,7 @@ export default function App() {
             </select>
           </div>
 
-          <div className="input-group">
-            <label>📥 В (фиат)</label>
+          <div className="input-group">            <label>📥 В (фиат)</label>
             <select value={toFiat} onChange={(e) => setToFiat(e.target.value)}>
               {FIAT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
@@ -188,8 +194,7 @@ export default function App() {
               <li key={i}>
                 <span className="hist-amount">{item.amount} {item.from}</span>
                 <span className="arrow">→</span>
-                <span className="hist-result">{item.result} {item.to}</span>
-                <span className="hist-time">{item.date}</span>
+                <span className="hist-result">{item.result} {item.to}</span>                <span className="hist-time">{item.date}</span>
               </li>
             ))}
           </ul>
@@ -197,7 +202,7 @@ export default function App() {
       )}
 
       <footer className="footer">
-        <p>Данные: CryptoCompare API • Обновлено: {new Date().toLocaleDateString('ru-RU')}</p>
+        <p>Данные: CryptoCompare API • Курс USD/BYN: {USD_TO_BYN_RATE} • {new Date().toLocaleDateString('ru-RU')}</p>
         <p>Портфолио-проект | React + Vite + LocalStorage</p>
       </footer>
     </div>
