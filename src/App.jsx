@@ -5,28 +5,26 @@ const CRYPTO_OPTIONS = [
   { id: 'BTC', name: 'Bitcoin', symbol: '₿' },
   { id: 'ETH', name: 'Ethereum', symbol: 'Ξ' },
   { id: 'USDT', name: 'Tether', symbol: '₮' },
-  { id: 'BNB', name: 'BNB', symbol: '◈' },
   { id: 'SOL', name: 'Solana', symbol: '◎' },
-  { id: 'USDC', name: 'USD Coin', symbol: '$' },
-  { id: 'XRP', name: 'Ripple', symbol: '✕' },
-  { id: 'DOGE', name: 'Dogecoin', symbol: 'Ð' },
   { id: 'TON', name: 'Toncoin', symbol: '💎' },
+  { id: 'BNB', name: 'BNB', symbol: '◈' },
+  { id: 'XRP', name: 'Ripple', symbol: '✕' },
   { id: 'ADA', name: 'Cardano', symbol: '₳' },
-  { id: 'TRX', name: 'TRON', symbol: '⊤' },
-  { id: 'AVAX', name: 'Avalanche', symbol: '🔺' },
-  { id: 'DOT', name: 'Polkadot', symbol: '●' },
-  { id: 'MATIC', name: 'Polygon', symbol: '⬡' },
-  { id: 'LTC', name: 'Litecoin', symbol: 'Ł' }
 ];
 
-const FIAT_OPTIONS = ['USD', 'EUR', 'BYN', 'RUB'];
+const FIAT_OPTIONS = [
+  { id: 'USD', name: 'Доллар США', symbol: '$' },
+  { id: 'EUR', name: 'Евро', symbol: '€' },
+  { id: 'BYN', name: 'Белорусский рубль', symbol: 'Br' },
+  { id: 'RUB', name: 'Российский рубль', symbol: '₽' },
+];
 
 export default function App() {
   const [prices, setPrices] = useState({});
-  const [usdToBynRate, setUsdToBynRate] = useState(3.25); // Дефолтное значение
   const [amount, setAmount] = useState('1');
-  const [fromCrypto, setFromCrypto] = useState('BTC');
-  const [toFiat, setToFiat] = useState('BYN');
+  const [fromCurrency, setFromCurrency] = useState('BTC'); // Из чего
+  const [toCurrency, setToCurrency] = useState('BYN');    // Во что
+  const [isReversed, setIsReversed] = useState(false);    // Режим реверса
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,106 +32,77 @@ export default function App() {
   // Загрузка истории
   useEffect(() => {
     const saved = localStorage.getItem('crypto_history');
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error('Ошибка чтения истории:', e);
-      }
-    }
+    if (saved) setHistory(JSON.parse(saved));
   }, []);
 
-  // Получение курса USD/BYN с НБРБ (Национальный банк РБ)
-  useEffect(() => {
-    const fetchUsdToBynRate = async () => {
-      try {
-        // API НБРБ - официальный курс доллара        const res = await fetch('https://www.nbrb.by/api/exrates/rates/USD?parammode=2');
-        if (res.ok) {
-          const data = await res.json();
-          setUsdToBynRate(data.Cur_OfficialRate);
-        }
-      } catch (err) {
-        console.warn('Не удалось получить курс НБРБ, используем запасной API');
-        // Запасной вариант - другой API
-        try {
-          const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-          if (res.ok) {
-            const data = await res.json();
-            if (data.rates.BYN) {
-              setUsdToBynRate(data.rates.BYN);
-            }
-          }
-        } catch (e) {
-          console.error('Не удалось загрузить курс USD/BYN');
-        }
-      }
-    };
-    
-    fetchUsdToBynRate();
-    // Обновляем курс раз в час
-    const intervalId = setInterval(fetchUsdToBynRate, 3600000);
-    return () => clearInterval(intervalId);
-  }, []);
-
-  // Получение курсов криптовалют
+  // Получение курсов
   useEffect(() => {
     const fetchPrices = async () => {
       try {
         setLoading(true);
         setError(null);
-        
         const cryptos = CRYPTO_OPTIONS.map(c => c.id).join(',');
-        // Запрашиваем только USD, EUR, RUB (без BYN)
+        const fiats = FIAT_OPTIONS.map(f => f.id).join(',');
+        
+        // Запрашиваем все пары (Crypto -> Fiat)
         const res = await fetch(
-          `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${cryptos}&tsyms=USD,EUR,RUB`
-        );
-        
-        if (!res.ok) throw new Error(`Ошибка API: ${res.status}`);
-        
-        const cryptoData = await res.json();
-        
-        // Проверяем валидность данных
-        if (!cryptoData.BTC || typeof cryptoData.BTC.USD !== 'number') {
-          throw new Error('Неверный формат данных');
-        }
-        // Добавляем расчет BYN через актуальный курс USD/BYN
-        const pricesWithBYN = {};
-        Object.keys(cryptoData).forEach(crypto => {
-          pricesWithBYN[crypto] = {
-            ...cryptoData[crypto],
-            BYN: cryptoData[crypto].USD * usdToBynRate
-          };
-        });
-        
-        setPrices(pricesWithBYN);
+          `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${cryptos}&tsyms=${fiats}`
+        );        if (!res.ok) throw new Error('Ошибка сети');
+        const data = await res.json();
+        setPrices(data);
       } catch (err) {
-        console.error('API ошибка:', err.message);
-        setError('⚠️ Не удалось загрузить курсы. Проверьте интернет-соединение.');
-        setPrices({});
+        setError('⚠️ Не удалось загрузить курсы. Проверьте интернет.');
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-    if (usdToBynRate > 0) {
-      fetchPrices();
-      // Обновляем курсы криптовалют каждые 30 секунд
-      const intervalId = setInterval(fetchPrices, 30000);
-      return () => clearInterval(intervalId);
+  // Функция переключения (Реверс)
+  const toggleDirection = () => {
+    setIsReversed(!isReversed);
+    setAmount('1'); // Сбрасываем сумму при переключении
+    // Меняем валюты местами для удобства
+    setFromCurrency(toCurrency);
+    setToCurrency(fromCurrency);
+  };
+
+  // --- Логика расчета ---
+  // Нам всегда нужно знать, какой сейчас "Crypto ID", а какой "Fiat ID"
+  const cryptoId = isReversed ? toCurrency : fromCurrency;
+  const fiatId = isReversed ? fromCurrency : toCurrency;
+  
+  // Берем цену 1 единицы крипты в фиате
+  const rate = prices[cryptoId]?.[fiatId] || 0;
+  
+  // Считаем результат
+  let result = 0;
+  let formattedResult = '';
+  
+  if (rate > 0 && amount) {
+    const numAmount = parseFloat(amount);
+    if (isReversed) {
+      // Фиат -> Крипта (Делим)
+      // Пример: 10 BYN / 4.5 = 2.22 USDT
+      result = numAmount / rate;
+      formattedResult = result.toFixed(6); // Крипту показываем с точностью до 6 знаков
+    } else {
+      // Крипта -> Фиат (Умножаем)
+      // Пример: 1 USDT * 4.5 = 4.50 BYN
+      result = numAmount * rate;
+      formattedResult = result.toFixed(2); // Фиат с 2 знаками
     }
-  }, [usdToBynRate]);
-
-  const price = prices[fromCrypto]?.[toFiat] || 0;
-  const numericAmount = parseFloat(amount) || 0;
-  const result = numericAmount * price;
-  const formattedResult = toFiat === 'BYN' || toFiat === 'RUB' ? result.toFixed(2) : result.toFixed(4);
-
+  }
   const saveToHistory = () => {
-    if (numericAmount <= 0 || !price) return;
+    if (!amount || result === 0) return;
     const entry = {
-      amount: numericAmount,
-      from: fromCrypto,
-      to: toFiat,
+      from: fromCurrency,
+      to: toCurrency,
+      amount: amount,
       result: formattedResult,
       date: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
     };
@@ -142,90 +111,78 @@ export default function App() {
     localStorage.setItem('crypto_history', JSON.stringify(updated));
   };
 
-  const clearHistory = () => {
-    setHistory([]);
-    localStorage.removeItem('crypto_history');
-  };
   return (
     <div className="app">
       <header className="header">
         <h1>🌍 Crypto Converter</h1>
-        <p>Конвертация криптовалют в фиат в реальном времени</p>
+        <p>Конвертация криптовалют и фиата в реальном времени</p>
       </header>
 
       <main className="card">
         {error && <div className="alert error">{error}</div>}
         
-        <div className="converter-grid">
-          <div className="input-group">
-            <label>💰 Сумма</label>
-            <input 
-              type="number" 
-              value={amount} 
-              onChange={(e) => setAmount(e.target.value)}
-              min="0"
-              step="any"
-              placeholder="0.00"
-            />
-          </div>
+        {/* Поле ввода суммы */}
+        <div className="input-group" style={{ marginBottom: '1rem' }}>
+          <label>{isReversed ? 'Сумма в фиате' : 'Сумма крипто'}:</label>
+          <input 
+            type="number" 
+            value={amount} 
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
 
+        {/* Блок выбора валют с кнопкой реверса */}
+        <div className="exchange-row">
           <div className="input-group">
-            <label>📤 Из (крипта)</label>
-            <select value={fromCrypto} onChange={(e) => setFromCrypto(e.target.value)}>
-              {CRYPTO_OPTIONS.map(c => (
-                <option key={c.id} value={c.id}>{c.id} — {c.name}</option>
+            <label>{isReversed ? 'Имею (Фиат)' : 'Имею (Крипта)'}</label>
+            <select value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value)}>
+              {(isReversed ? FIAT_OPTIONS : CRYPTO_OPTIONS).map(opt => (
+                <option key={opt.id} value={opt.id}>{opt.id} — {opt.name}</option>
               ))}
             </select>
           </div>
 
+          <button className="btn-reverse" onClick={toggleDirection} title="Поменять направление">
+            🔄
+          </button>
           <div className="input-group">
-            <label>📥 В (фиат)</label>
-            <select value={toFiat} onChange={(e) => setToFiat(e.target.value)}>
-              {FIAT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+            <label>{isReversed ? 'Получу (Крипта)' : 'Получу (Фиат)'}</label>
+            <select value={toCurrency} onChange={(e) => setToCurrency(e.target.value)}>
+              {(isReversed ? CRYPTO_OPTIONS : FIAT_OPTIONS).map(opt => (
+                <option key={opt.id} value={opt.id}>{opt.id} — {opt.name}</option>
+              ))}
             </select>
           </div>
         </div>
 
+        {/* Результат */}
         <div className="result-box">
-          {loading ? (
-            <span className="result-label">Загрузка курсов...</span>
-          ) : error ? (
+          {loading ? 'Загрузка курсов...' : (
             <>
-              <span className="result-label" style={{ color: '#ef4444' }}>{error}</span>
-              <button className="btn-reset" onClick={() => window.location.reload()}>
-                🔄 Повторить попытку
-              </button>            </>
-          ) : (
-            <>
-              <span className="result-label">Результат конвертации:</span>
-              <span className="result-value">
-                {numericAmount > 0 && price ? `${formattedResult} ${toFiat}` : '—'}
+              <span className="result-label">
+                {isReversed ? 'Вы получите:' : 'Стоимость:'}
               </span>
-              {toFiat === 'BYN' && (
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-                  Курс USD/BYN: {usdToBynRate.toFixed(4)} (НБРБ)
-                </div>
-              )}
-              <div className="button-group">
-                <button className="btn-save" onClick={saveToHistory} disabled={numericAmount <= 0 || !price}>
-                  💾 Сохранить
-                </button>
-                <button className="btn-reset" onClick={() => { setAmount('1'); setFromCrypto('BTC'); setToFiat('BYN'); }}>
-                  🔄 Сброс
-                </button>
+              <span className="result-value">
+                {amount > 0 ? `${formattedResult} ${toCurrency}` : '—'}
+              </span>
+              <div className="rate-info">
+                Курс: 1 {cryptoId} ≈ {rate ? (rate > 100 ? rate.toFixed(2) : rate.toFixed(4)) : 0} {fiatId}
               </div>
             </>
           )}
+          <div className="button-group" style={{ marginTop: '1.5rem' }}>
+            <button className="btn-save" onClick={saveToHistory}>💾 Сохранить</button>
+            <button className="btn-reset" onClick={() => { setAmount('1'); setFromCurrency('BTC'); setToCurrency('BYN'); setIsReversed(false); }}>🔄 Сброс</button>
+          </div>
         </div>
       </main>
 
       {history.length > 0 && (
         <section className="history">
           <div className="history-header">
-            <h2>📜 История операций</h2>
-            <button className="btn-clear" onClick={clearHistory}>
-              🗑️ Очистить
-            </button>
+            <h2>📜 История</h2>
+            <button className="btn-clear" onClick={() => { setHistory([]); localStorage.removeItem('crypto_history'); }}>🗑️</button>
           </div>
           <ul>
             {history.map((item, i) => (
@@ -233,16 +190,14 @@ export default function App() {
                 <span className="hist-amount">{item.amount} {item.from}</span>
                 <span className="arrow">→</span>
                 <span className="hist-result">{item.result} {item.to}</span>
-                <span className="hist-time">{item.date}</span>
               </li>
             ))}
           </ul>
         </section>
-      )}
-
+      )}      
       <footer className="footer">
-        <p>Крипто: CryptoCompare API • USD/BYN: НБРБ • {new Date().toLocaleDateString('ru-RU')}</p>
-        <p>Портфолио-проект | React + Vite + LocalStorage</p>
-      </footer>    </div>
+        <p>Данные: CryptoCompare API • {new Date().toLocaleDateString('ru-RU')}</p>
+      </footer>
+    </div>
   );
 }
