@@ -21,11 +21,9 @@ const CRYPTO_OPTIONS = [
 
 const FIAT_OPTIONS = ['USD', 'EUR', 'BYN', 'RUB'];
 
-// Актуальный курс USD к BYN (обновляется вручную или через API НБРБ)
-const USD_TO_BYN_RATE = 2.82; // По состоянию на май 2026
-
 export default function App() {
   const [prices, setPrices] = useState({});
+  const [usdToBynRate, setUsdToBynRate] = useState(3.25); // Дефолтное значение
   const [amount, setAmount] = useState('1');
   const [fromCrypto, setFromCrypto] = useState('BTC');
   const [toFiat, setToFiat] = useState('BYN');
@@ -33,6 +31,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Загрузка истории
   useEffect(() => {
     const saved = localStorage.getItem('crypto_history');
     if (saved) {
@@ -44,32 +43,65 @@ export default function App() {
     }
   }, []);
 
+  // Получение курса USD/BYN с НБРБ (Национальный банк РБ)
+  useEffect(() => {
+    const fetchUsdToBynRate = async () => {
+      try {
+        // API НБРБ - официальный курс доллара        const res = await fetch('https://www.nbrb.by/api/exrates/rates/USD?parammode=2');
+        if (res.ok) {
+          const data = await res.json();
+          setUsdToBynRate(data.Cur_OfficialRate);
+        }
+      } catch (err) {
+        console.warn('Не удалось получить курс НБРБ, используем запасной API');
+        // Запасной вариант - другой API
+        try {
+          const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.rates.BYN) {
+              setUsdToBynRate(data.rates.BYN);
+            }
+          }
+        } catch (e) {
+          console.error('Не удалось загрузить курс USD/BYN');
+        }
+      }
+    };
+    
+    fetchUsdToBynRate();
+    // Обновляем курс раз в час
+    const intervalId = setInterval(fetchUsdToBynRate, 3600000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Получение курсов криптовалют
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        setLoading(true);        setError(null);
+        setLoading(true);
+        setError(null);
         
         const cryptos = CRYPTO_OPTIONS.map(c => c.id).join(',');
-        // Запрашиваем только USD и EUR, так как BYN может быть некорректным
+        // Запрашиваем только USD, EUR, RUB (без BYN)
         const res = await fetch(
           `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${cryptos}&tsyms=USD,EUR,RUB`
         );
         
         if (!res.ok) throw new Error(`Ошибка API: ${res.status}`);
         
-        const data = await res.json();
+        const cryptoData = await res.json();
         
         // Проверяем валидность данных
-        if (!data.BTC || typeof data.BTC.USD !== 'number') {
+        if (!cryptoData.BTC || typeof cryptoData.BTC.USD !== 'number') {
           throw new Error('Неверный формат данных');
         }
-
-        // Добавляем расчет BYN через USD
+        // Добавляем расчет BYN через актуальный курс USD/BYN
         const pricesWithBYN = {};
-        Object.keys(data).forEach(crypto => {
+        Object.keys(cryptoData).forEach(crypto => {
           pricesWithBYN[crypto] = {
-            ...data[crypto],
-            BYN: data[crypto].USD * USD_TO_BYN_RATE
+            ...cryptoData[crypto],
+            BYN: cryptoData[crypto].USD * usdToBynRate
           };
         });
         
@@ -83,12 +115,13 @@ export default function App() {
       }
     };
 
-    fetchPrices();
-    // Обновляем каждые 30 секунд
-    const intervalId = setInterval(fetchPrices, 30000);
-    
-    return () => clearInterval(intervalId);
-  }, []);
+    if (usdToBynRate > 0) {
+      fetchPrices();
+      // Обновляем курсы криптовалют каждые 30 секунд
+      const intervalId = setInterval(fetchPrices, 30000);
+      return () => clearInterval(intervalId);
+    }
+  }, [usdToBynRate]);
 
   const price = prices[fromCrypto]?.[toFiat] || 0;
   const numericAmount = parseFloat(amount) || 0;
@@ -96,7 +129,8 @@ export default function App() {
   const formattedResult = toFiat === 'BYN' || toFiat === 'RUB' ? result.toFixed(2) : result.toFixed(4);
 
   const saveToHistory = () => {
-    if (numericAmount <= 0 || !price) return;    const entry = {
+    if (numericAmount <= 0 || !price) return;
+    const entry = {
       amount: numericAmount,
       from: fromCrypto,
       to: toFiat,
@@ -112,7 +146,6 @@ export default function App() {
     setHistory([]);
     localStorage.removeItem('crypto_history');
   };
-
   return (
     <div className="app">
       <header className="header">
@@ -145,7 +178,8 @@ export default function App() {
             </select>
           </div>
 
-          <div className="input-group">            <label>📥 В (фиат)</label>
+          <div className="input-group">
+            <label>📥 В (фиат)</label>
             <select value={toFiat} onChange={(e) => setToFiat(e.target.value)}>
               {FIAT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
@@ -160,14 +194,18 @@ export default function App() {
               <span className="result-label" style={{ color: '#ef4444' }}>{error}</span>
               <button className="btn-reset" onClick={() => window.location.reload()}>
                 🔄 Повторить попытку
-              </button>
-            </>
+              </button>            </>
           ) : (
             <>
               <span className="result-label">Результат конвертации:</span>
               <span className="result-value">
                 {numericAmount > 0 && price ? `${formattedResult} ${toFiat}` : '—'}
               </span>
+              {toFiat === 'BYN' && (
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+                  Курс USD/BYN: {usdToBynRate.toFixed(4)} (НБРБ)
+                </div>
+              )}
               <div className="button-group">
                 <button className="btn-save" onClick={saveToHistory} disabled={numericAmount <= 0 || !price}>
                   💾 Сохранить
@@ -194,7 +232,8 @@ export default function App() {
               <li key={i}>
                 <span className="hist-amount">{item.amount} {item.from}</span>
                 <span className="arrow">→</span>
-                <span className="hist-result">{item.result} {item.to}</span>                <span className="hist-time">{item.date}</span>
+                <span className="hist-result">{item.result} {item.to}</span>
+                <span className="hist-time">{item.date}</span>
               </li>
             ))}
           </ul>
@@ -202,9 +241,8 @@ export default function App() {
       )}
 
       <footer className="footer">
-        <p>Данные: CryptoCompare API • Курс USD/BYN: {USD_TO_BYN_RATE} • {new Date().toLocaleDateString('ru-RU')}</p>
+        <p>Крипто: CryptoCompare API • USD/BYN: НБРБ • {new Date().toLocaleDateString('ru-RU')}</p>
         <p>Портфолио-проект | React + Vite + LocalStorage</p>
-      </footer>
-    </div>
+      </footer>    </div>
   );
 }
