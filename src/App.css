@@ -153,3 +153,63 @@
   .history li { flex-wrap: wrap; }
   .hist-time { margin-left: 0; width: 100%; text-align: right; }
 }
+
+/* Добавьте в конец файла App.css */
+.exchange-row {
+  display: flex;
+  align-items: flex-end; /* Выравнивание по низу, чтобы лейблы были наверху */
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.exchange-row .input-group {
+  flex: 1;
+  margin-bottom: 0; /* Убираем отступ снизу, так как он есть у контейнера */
+}
+
+.btn-reverse {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.3s;
+  margin-bottom: 4px; /* Чуть поднять визуально */
+}
+
+.btn-reverse:hover {
+  background: var(--primary);
+  color: white;
+  transform: rotate(180deg);
+}
+
+.rate-info {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+/* Адаптив для мобильных: кнопка реверса сверху */
+@media (max-width: 480px) {
+  .exchange-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  .exchange-row .input-group {
+    width: 100%;
+  }
+  .btn-reverse {
+    transform: rotate(90deg); /* Поворачиваем стрелку вертикально */
+    margin: 0;
+  }
+  .btn-reverse:hover {
+    transform: rotate(270deg);
+  }
+}
