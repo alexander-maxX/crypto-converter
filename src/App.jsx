@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
+// Массив крипто-валют (объекты)
 const CRYPTO_OPTIONS = [
   { id: 'BTC', name: 'Bitcoin', symbol: '₿' },
   { id: 'ETH', name: 'Ethereum', symbol: 'Ξ' },
@@ -19,11 +20,17 @@ const CRYPTO_OPTIONS = [
   { id: 'LTC', name: 'Litecoin', symbol: 'Ł' }
 ];
 
-const FIAT_OPTIONS = ['USD', 'EUR', 'BYN', 'RUB'];
+// ИСПРАВЛЕНИЕ: Теперь это массив объектов, чтобы код отрисовки работал одинаково для всех
+const FIAT_OPTIONS = [
+  { id: 'USD', name: 'Доллар США', symbol: '$' },
+  { id: 'EUR', name: 'Евро', symbol: '€' },
+  { id: 'BYN', name: 'Белорусский рубль', symbol: 'Br' },
+  { id: 'RUB', name: 'Российский рубль', symbol: '₽' },
+];
 
 export default function App() {
   const [prices, setPrices] = useState({});
-  const [usdToBynRate, setUsdToBynRate] = useState(3.25); // Дефолт, обновится через API
+  const [usdToBynRate, setUsdToBynRate] = useState(3.25); // Дефолтное значение
   const [amount, setAmount] = useState('1');
   const [fromCurrency, setFromCurrency] = useState('BTC');
   const [toCurrency, setToCurrency] = useState('BYN');
@@ -40,14 +47,13 @@ export default function App() {
     }
   }, []);
 
-  // 1. Получаем официальный курс USD -> BYN
-  useEffect(() => {
+  // Получение курса USD -> BYN  useEffect(() => {
     const fetchUsdRate = async () => {
       try {
-        // Используем надежный бесплатный API для курсов валют
         const res = await fetch('https://open.er-api.com/v6/latest/USD');
         if (res.ok) {
-          const data = await res.json();          if (data.rates && data.rates.BYN) {
+          const data = await res.json();
+          if (data.rates && data.rates.BYN) {
             setUsdToBynRate(data.rates.BYN);
           }
         }
@@ -56,12 +62,11 @@ export default function App() {
       }
     };
     fetchUsdRate();
-    // Обновляем курс раз в час
     const interval = setInterval(fetchUsdRate, 3600000);
     return () => clearInterval(interval);
   }, []);
 
-  // 2. Получаем курсы крипто (только USD, EUR, RUB - BYN считаем сами)
+  // Получение курсов криптовалют (только USD, EUR, RUB - BYN считаем сами)
   useEffect(() => {
     const fetchPrices = async () => {
       try {
@@ -69,7 +74,6 @@ export default function App() {
         setError(null);
         const cryptos = CRYPTO_OPTIONS.map(c => c.id).join(',');
         
-        // Запрашиваем цены в USD, EUR, RUB. BYN в API не просим, чтобы не брать кривые данные
         const res = await fetch(
           `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${cryptos}&tsyms=USD,EUR,RUB`
         );
@@ -89,28 +93,26 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Реверс
+  // Логика переключения
   const toggleDirection = () => {
     setIsReversed(!isReversed);
-    setAmount('1');
-  };
+    setAmount('1');  };
 
-  // Логика выбора валют
-  const currentFromOptions = isReversed ? FIAT_OPTIONS : CRYPTO_OPTIONS;  const currentToOptions = isReversed ? CRYPTO_OPTIONS : FIAT_OPTIONS;
+  // Определение списков в зависимости от режима
+  const currentFromOptions = isReversed ? FIAT_OPTIONS : CRYPTO_OPTIONS;
+  const currentToOptions = isReversed ? CRYPTO_OPTIONS : FIAT_OPTIONS;
   
+  // Текущие выбранные значения
   const currentFrom = isReversed ? toCurrency : fromCurrency;
   const currentTo = isReversed ? fromCurrency : toCurrency;
 
-  // --- МАТЕМАТИКА ---
-  // Определяем, какая валюта у нас "Крипто", а какая "Фиат"
+  // --- Математика расчета ---
   const cryptoId = isReversed ? toCurrency : fromCurrency;
   const fiatId = isReversed ? fromCurrency : toCurrency;
 
-  // Получаем цену 1 единицы крипты в фиате
   let price = prices[cryptoId]?.[fiatId];
 
-  // Если выбран BYN, считаем через доллар (Кросс-курс)
-  // Формула: Цена в USD * Курс Доллара к BYN
+  // Кросс-курс для BYN
   if (fiatId === 'BYN' && prices[cryptoId]?.['USD']) {
     price = prices[cryptoId]['USD'] * usdToBynRate;
   }
@@ -123,11 +125,11 @@ export default function App() {
   if (rate > 0 && amount) {
     const numAmount = parseFloat(amount);
     if (isReversed) {
-      // Фиат -> Крипта (Делим)
+      // Фиат -> Крипта
       result = numAmount / rate;
       formattedResult = result.toFixed(6);
     } else {
-      // Крипта -> Фиат (Умножаем)
+      // Крипта -> Фиат
       result = numAmount * rate;
       formattedResult = result.toFixed(2);
     }
@@ -143,9 +145,9 @@ export default function App() {
       date: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
     };
     const updated = [entry, ...history].slice(0, 10);
-    setHistory(updated);
-    localStorage.setItem('crypto_history', JSON.stringify(updated));
+    setHistory(updated);    localStorage.setItem('crypto_history', JSON.stringify(updated));
   };
+
   const handleReset = () => {
     setAmount('1');
     setFromCurrency('BTC');
@@ -192,9 +194,9 @@ export default function App() {
             <select value={currentTo} onChange={(e) => isReversed ? setFromCurrency(e.target.value) : setToCurrency(e.target.value)}>
               {currentToOptions.map(opt => (
                 <option key={opt.id} value={opt.id}>{opt.id} — {opt.name}</option>
-              ))}
-            </select>
-          </div>        </div>
+              ))}            </select>
+          </div>
+        </div>
 
         <div className="result-box">
           {loading ? 'Загрузка курсов...' : (
@@ -206,7 +208,6 @@ export default function App() {
                 {amount > 0 ? `${formattedResult} ${currentTo}` : '—'}
               </span>
               
-              {/* Показываем используемый курс для BYN */}
               {fiatId === 'BYN' && (
                 <div className="rate-info">
                   Курс (через USD): 1 {cryptoId} ≈ {rate ? rate.toFixed(4) : 0} BYN
@@ -242,10 +243,10 @@ export default function App() {
             ))}
           </ul>
         </section>
-      )}
-            <footer className="footer">
+      )}      
+      <footer className="footer">
         <p>Крипто: CryptoCompare • USD/BYN: Open Exchange Rates • {new Date().toLocaleDateString('ru-RU')}</p>
       </footer>
     </div>
   );
-    }
+}
