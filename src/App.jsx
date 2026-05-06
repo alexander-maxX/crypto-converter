@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
-// Массив крипто-валют (объекты)
 const CRYPTO_OPTIONS = [
   { id: 'BTC', name: 'Bitcoin', symbol: '₿' },
   { id: 'ETH', name: 'Ethereum', symbol: 'Ξ' },
@@ -20,7 +19,7 @@ const CRYPTO_OPTIONS = [
   { id: 'LTC', name: 'Litecoin', symbol: 'Ł' }
 ];
 
-// ИСПРАВЛЕНИЕ: Теперь это массив объектов, чтобы код отрисовки работал одинаково для всех
+// ИСПРАВЛЕНО: Теперь это массив объектов, как CRYPTO_OPTIONS
 const FIAT_OPTIONS = [
   { id: 'USD', name: 'Доллар США', symbol: '$' },
   { id: 'EUR', name: 'Евро', symbol: '€' },
@@ -30,7 +29,7 @@ const FIAT_OPTIONS = [
 
 export default function App() {
   const [prices, setPrices] = useState({});
-  const [usdToBynRate, setUsdToBynRate] = useState(3.25); // Дефолтное значение
+  const [usdToBynRate, setUsdToBynRate] = useState(3.25);
   const [amount, setAmount] = useState('1');
   const [fromCurrency, setFromCurrency] = useState('BTC');
   const [toCurrency, setToCurrency] = useState('BYN');
@@ -47,8 +46,8 @@ export default function App() {
     }
   }, []);
 
-  // Получение курса USD -> BYN  useEffect(() => {
-    const fetchUsdRate = async () => {
+  // Получение курса USD -> BYN
+  useEffect(() => {    const fetchUsdRate = async () => {
       try {
         const res = await fetch('https://open.er-api.com/v6/latest/USD');
         if (res.ok) {
@@ -66,7 +65,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Получение курсов криптовалют (только USD, EUR, RUB - BYN считаем сами)
+  // Получение курсов криптовалют
   useEffect(() => {
     const fetchPrices = async () => {
       try {
@@ -93,26 +92,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Логика переключения
+  // Реверс
   const toggleDirection = () => {
     setIsReversed(!isReversed);
-    setAmount('1');  };
-
-  // Определение списков в зависимости от режима
+    setAmount('1');
+  };
+  // Определение списков
   const currentFromOptions = isReversed ? FIAT_OPTIONS : CRYPTO_OPTIONS;
   const currentToOptions = isReversed ? CRYPTO_OPTIONS : FIAT_OPTIONS;
   
-  // Текущие выбранные значения
   const currentFrom = isReversed ? toCurrency : fromCurrency;
   const currentTo = isReversed ? fromCurrency : toCurrency;
 
-  // --- Математика расчета ---
+  // Математика
   const cryptoId = isReversed ? toCurrency : fromCurrency;
   const fiatId = isReversed ? fromCurrency : toCurrency;
 
   let price = prices[cryptoId]?.[fiatId];
 
-  // Кросс-курс для BYN
   if (fiatId === 'BYN' && prices[cryptoId]?.['USD']) {
     price = prices[cryptoId]['USD'] * usdToBynRate;
   }
@@ -125,11 +122,9 @@ export default function App() {
   if (rate > 0 && amount) {
     const numAmount = parseFloat(amount);
     if (isReversed) {
-      // Фиат -> Крипта
       result = numAmount / rate;
       formattedResult = result.toFixed(6);
     } else {
-      // Крипта -> Фиат
       result = numAmount * rate;
       formattedResult = result.toFixed(2);
     }
@@ -145,12 +140,12 @@ export default function App() {
       date: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
     };
     const updated = [entry, ...history].slice(0, 10);
-    setHistory(updated);    localStorage.setItem('crypto_history', JSON.stringify(updated));
+    setHistory(updated);
+    localStorage.setItem('crypto_history', JSON.stringify(updated));
   };
 
   const handleReset = () => {
-    setAmount('1');
-    setFromCurrency('BTC');
+    setAmount('1');    setFromCurrency('BTC');
     setToCurrency('BYN');
     setIsReversed(false);
   };
@@ -194,12 +189,12 @@ export default function App() {
             <select value={currentTo} onChange={(e) => isReversed ? setFromCurrency(e.target.value) : setToCurrency(e.target.value)}>
               {currentToOptions.map(opt => (
                 <option key={opt.id} value={opt.id}>{opt.id} — {opt.name}</option>
-              ))}            </select>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="result-box">
-          {loading ? 'Загрузка курсов...' : (
+        <div className="result-box">          {loading ? 'Загрузка курсов...' : (
             <>
               <span className="result-label">
                 {isReversed ? 'Вы получите:' : 'Стоимость:'}
@@ -243,10 +238,10 @@ export default function App() {
             ))}
           </ul>
         </section>
-      )}      
+      )}
+      
       <footer className="footer">
         <p>Крипто: CryptoCompare • USD/BYN: Open Exchange Rates • {new Date().toLocaleDateString('ru-RU')}</p>
       </footer>
-    </div>
-  );
-}
+    </div>  );
+          }
